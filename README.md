@@ -33,17 +33,23 @@ func main() {
 }
 ```
 
-Also see the two example programs in the `example` directory:
+Install `cmd/sss` to use the command line interface:
+
+	go install github.com/kyodo-tech/shamir/cmd/sss@latest
+
+Then run `sss` to split a secret into shares and combine them to reconstruct the secret:
 
 ```sh
-go run example/split.go "my secret"
+Usage: sss -mode=split -secret=<secret> -n=<number of shares> -T=<threshold>
+# Example:
+sss -secret "my secret"
 # Output:
-# Share 0: lK8LyefHjxzOAQ==
-# Share 1: 1Ws3IGJh/lVQAg==
-# Share 2: LL0cmuDFAyzqAw==
-# Share 3: Wf8RJQs43iALBA==
-# Share 4: oCk6n4mcI1mxBQ==
-go run ./example/combine.go lK8LyefHjxzOAQ==,LL0cmuDFAyzqAw==,oCk6n4mcI1mxBQ==
+# N8QLmd6YcLu2AQ==
+# Nnubhbvx52y8Ag==
+# bMawbwAK5bJ+Aw==
+# SurUYDi7Mfm4BA==
+# EFf/ioNAMyd6BQ==
+sss -mode combine -shares N8QLmd6YcLu2AQ==,bMawbwAK5bJ+Aw==,EFf/ioNAMyd6BQ==
 # Output:
-# Reconstructed secret: my secret
+# my secret
 ```
