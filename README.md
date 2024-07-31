@@ -37,19 +37,32 @@ Install `cmd/sss` to use the command line interface:
 
 	go install github.com/kyodo-tech/shamir/cmd/sss@latest
 
+```sh
+Usage of sss:
+  -encoding string
+        Encoding: base64 or hex (default "base64")
+  -mode string
+        Mode: split or combine (default "split")
+  -secret string
+        The secret to split (for split mode)
+  -shares string
+        Comma-separated shares (for combine mode)
+  -n int
+        Total number of shares (default 5)
+  -t int
+        Number of shares needed to reconstruct the secret (default 3)
+```
+
 Then run `sss` to split a secret into shares and combine them to reconstruct the secret:
 
 ```sh
-Usage: sss -mode=split -secret=<secret> -n=<number of shares> -T=<threshold>
 # Example:
-sss -secret "my secret"
-# Output:
-# N8QLmd6YcLu2AQ==
-# Nnubhbvx52y8Ag==
-# bMawbwAK5bJ+Aw==
-# SurUYDi7Mfm4BA==
-# EFf/ioNAMyd6BQ==
-sss -mode combine -shares N8QLmd6YcLu2AQ==,bMawbwAK5bJ+Aw==,EFf/ioNAMyd6BQ==
-# Output:
+sss -secret "my secret" -encoding hex -t 2 -n 5
+# 4de08f03d23ab8360d01
+# 2d50659310d1fdc38602
+# 0dc9cae3a7883790ff03
+# ed2baaa88f1c77328b04
+# cdb205d83845bd61f205
+sss -mode=combine -encoding hex -shares 4de08f03d23ab8360d01,0dc9cae3a7883790ff03
 # my secret
 ```
