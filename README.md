@@ -1,6 +1,6 @@
 ## Shamir's Secret Sharing
 
-This repository provides a simple implementation of Shamir's Secret Sharing in Go, allowing to split a secret into multiple shares and reconstruct it using a subset of those shares.
+This repository provides a minimal implementation of Shamir's Secret Sharing in Go, allowing to split a secret into multiple shares and reconstruct it using a subset of those shares.
 
 - Split a secret into `N` shares with a threshold of `T` shares required to reconstruct the secret.
 - Arithmetic operations in Galois Field (GF(`2^8`)).

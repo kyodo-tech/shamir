@@ -2,21 +2,34 @@ package shamir
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 )
 
+var (
+	ErrPartsLessThanThreshold  = errors.New("number of parts cannot be less than the threshold")
+	ErrPartsExceedLimit        = errors.New("number of parts cannot exceed 255")
+	ErrThresholdTooSmall       = errors.New("threshold must be at least 2")
+	ErrThresholdExceedLimit    = errors.New("threshold cannot exceed 255")
+	ErrEmptySecret             = errors.New("cannot split an empty secret")
+	ErrInsufficientShares      = errors.New("less than two shares cannot be used to reconstruct the secret")
+	ErrSharesTooShort          = errors.New("shares must be at least two bytes long")
+	ErrInconsistentShareLength = errors.New("all shares must be the same length")
+	ErrDivisionByZero          = errors.New("division by zero")
+)
+
 type polynomial struct {
-	coefficients []uint8
+	coeffs []uint8
 }
 
 func newPolynomial(intercept, degree uint8) (*polynomial, error) {
 	p := &polynomial{
-		coefficients: make([]uint8, degree+1),
+		coeffs: make([]uint8, degree+1),
 	}
-	p.coefficients[0] = intercept
+	p.coeffs[0] = intercept
 
-	if _, err := rand.Read(p.coefficients[1:]); err != nil {
-		return nil, err
+	if _, err := rand.Read(p.coeffs[1:]); err != nil {
+		return nil, fmt.Errorf("failed to generate random coefficients: %w", err)
 	}
 
 	return p, nil
@@ -24,85 +37,82 @@ func newPolynomial(intercept, degree uint8) (*polynomial, error) {
 
 func (p *polynomial) evaluate(x uint8) uint8 {
 	if x == 0 {
-		return p.coefficients[0]
+		return p.coeffs[0]
 	}
 
-	out := p.coefficients[len(p.coefficients)-1]
-	for i := len(p.coefficients) - 2; i >= 0; i-- {
-		out = add(mult(out, x), p.coefficients[i])
+	result := p.coeffs[len(p.coeffs)-1]
+	for i := len(p.coeffs) - 2; i >= 0; i-- {
+		result = gfAdd(gfMult(result, x), p.coeffs[i])
 	}
-	return out
+	return result
 }
 
-// Split divides the secret into parts shares with a threshold of minimum shares to reconstruct the secret.
-func Split(secret []byte, N, T int) ([][]byte, error) {
-	if N < T {
-		return nil, fmt.Errorf("parts cannot be less than threshold")
+// Split divides the secret into n shares with a threshold t for reconstruction.
+func Split(secret []byte, n, t int) ([][]byte, error) {
+	if n < t {
+		return nil, ErrPartsLessThanThreshold
 	}
-	if N > 255 {
-		return nil, fmt.Errorf("parts cannot exceed 255")
+	if n > 255 {
+		return nil, ErrPartsExceedLimit
 	}
-	if T < 2 {
-		return nil, fmt.Errorf("threshold must be at least 2")
+	if t < 2 {
+		return nil, ErrThresholdTooSmall
 	}
-	if T > 255 {
-		return nil, fmt.Errorf("threshold cannot exceed 255")
+	if t > 255 {
+		return nil, ErrThresholdExceedLimit
 	}
 	if len(secret) == 0 {
-		return nil, fmt.Errorf("cannot split an empty secret")
+		return nil, ErrEmptySecret
 	}
 
-	// Generate unique x-coordinates for each share
-	xCoordinates := make([]uint8, N)
-	for i := 0; i < N; i++ {
-		xCoordinates[i] = uint8(i + 1)
+	xCoords := make([]uint8, n)
+	for i := 0; i < n; i++ {
+		xCoords[i] = uint8(i + 1)
 	}
 
-	// Initialize shares with the secret length + 1 (for the x-coordinate)
-	shares := make([][]byte, N)
+	shares := make([][]byte, n)
 	for i := range shares {
 		shares[i] = make([]byte, len(secret)+1)
-		shares[i][len(secret)] = xCoordinates[i]
+		shares[i][len(secret)] = xCoords[i]
 	}
 
-	// Create a polynomial for each byte in the secret and evaluate it at each x-coordinate
 	for i, b := range secret {
-		p, err := newPolynomial(b, uint8(T-1))
+		p, err := newPolynomial(b, uint8(t-1))
 		if err != nil {
 			return nil, err
 		}
 
-		for j := 0; j < N; j++ {
-			shares[j][i] = p.evaluate(xCoordinates[j])
+		for j := 0; j < n; j++ {
+			shares[j][i] = p.evaluate(xCoords[j])
 		}
 	}
 
 	return shares, nil
 }
 
-// Combine reconstructs the secret from the provided shares.
+// Combine reconstructs the secret from the shares.
 func Combine(shares [][]byte) ([]byte, error) {
 	if len(shares) < 2 {
-		return nil, fmt.Errorf("less than two shares cannot be used to reconstruct the secret")
+		return nil, ErrInsufficientShares
 	}
 
-	shareLength := len(shares[0])
-	if shareLength < 2 {
-		return nil, fmt.Errorf("shares must be at least two bytes long")
+	shareLen := len(shares[0])
+	if shareLen < 2 {
+		return nil, ErrSharesTooShort
 	}
 
 	for _, share := range shares {
-		if len(share) != shareLength {
-			return nil, fmt.Errorf("all shares must be the same length")
+		if len(share) != shareLen {
+			return nil, ErrInconsistentShareLength
 		}
 	}
 
-	secret := make([]byte, shareLength-1)
+	secret := make([]byte, shareLen-1)
 	xSamples := make([]uint8, len(shares))
 	ySamples := make([]uint8, len(shares))
 
 	for i, share := range shares {
-		xSamples[i] = share[shareLength-1]
+		xSamples[i] = share[shareLen-1]
 	}
 
 	for i := range secret {
@@ -110,7 +120,7 @@ func Combine(shares [][]byte) ([]byte, error) {
 			ySamples[j] = share[i]
 		}
 
-		val, err := interpolatePolynomialSafe(xSamples, ySamples, 0)
+		val, err := interpolatePolynomial(xSamples, ySamples, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -121,36 +131,36 @@ func Combine(shares [][]byte) ([]byte, error) {
 	return secret, nil
 }
 
-func interpolatePolynomialSafe(xSamples, ySamples []uint8, x uint8) (uint8, error) {
+func interpolatePolynomial(xSamples, ySamples []uint8, x uint8) (uint8, error) {
 	result := uint8(0)
 	for i := range xSamples {
 		num, denom := uint8(1), uint8(1)
 		for j := range xSamples {
 			if i != j {
-				num = mult(num, add(x, xSamples[j]))
-				denom = mult(denom, add(xSamples[i], xSamples[j]))
+				num = gfMult(num, gfAdd(x, xSamples[j]))
+				denom = gfMult(denom, gfAdd(xSamples[i], xSamples[j]))
 			}
 		}
-		term, err := div(num, denom)
+		term, err := gfDiv(num, denom)
 		if err != nil {
 			return 0, err
 		}
-		result = add(result, mult(ySamples[i], term))
+		result = gfAdd(result, gfMult(ySamples[i], term))
 	}
 	return result, nil
 }
 
 // Helper functions for arithmetic in GF(2^8)
 
-func add(a, b uint8) uint8 {
+func gfAdd(a, b uint8) uint8 {
 	return a ^ b
 }
 
-func mult(a, b uint8) uint8 {
-	var p uint8
+func gfMult(a, b uint8) uint8 {
+	var product uint8
 	for b > 0 {
 		if b&1 == 1 {
-			p ^= a
+			product ^= a
 		}
 		if a&0x80 > 0 {
 			a = (a << 1) ^ 0x1B
@@ -159,23 +169,23 @@ func mult(a, b uint8) uint8 {
 		}
 		b >>= 1
 	}
-	return p
+	return product
 }
 
-func div(a, b uint8) (uint8, error) {
+func gfDiv(a, b uint8) (uint8, error) {
 	if b == 0 {
-		return 0, fmt.Errorf("division by zero")
+		return 0, ErrDivisionByZero
 	}
-	return mult(a, inverse(b)), nil
+	return gfMult(a, gfInverse(b)), nil
 }
 
-func inverse(a uint8) uint8 {
-	var b, c uint8
-	for b = 1; b != 0; b++ {
-		if mult(a, b) == 1 {
-			c = b
+func gfInverse(a uint8) uint8 {
+	var inv uint8
+	for b := uint8(1); b != 0; b++ {
+		if gfMult(a, b) == 1 {
+			inv = b
 			break
 		}
 	}
-	return c
+	return inv
 }

@@ -100,14 +100,14 @@ func TestFieldOperations(t *testing.T) {
 		a, b, expected uint8
 		op             func(uint8, uint8) (uint8, error)
 	}{
-		{16, 16, 0, func(a, b uint8) (uint8, error) { return add(a, b), nil }},
-		{3, 4, 7, func(a, b uint8) (uint8, error) { return add(a, b), nil }},
-		{3, 7, 9, func(a, b uint8) (uint8, error) { return mult(a, b), nil }},
-		{3, 0, 0, func(a, b uint8) (uint8, error) { return mult(a, b), nil }},
-		{0, 3, 0, func(a, b uint8) (uint8, error) { return mult(a, b), nil }},
-		{0, 7, 0, div},
-		{3, 3, 1, div},
-		{6, 3, 2, div},
+		{16, 16, 0, func(a, b uint8) (uint8, error) { return gfAdd(a, b), nil }},
+		{3, 4, 7, func(a, b uint8) (uint8, error) { return gfAdd(a, b), nil }},
+		{3, 7, 9, func(a, b uint8) (uint8, error) { return gfMult(a, b), nil }},
+		{3, 0, 0, func(a, b uint8) (uint8, error) { return gfMult(a, b), nil }},
+		{0, 3, 0, func(a, b uint8) (uint8, error) { return gfMult(a, b), nil }},
+		{0, 7, 0, gfDiv},
+		{3, 3, 1, gfDiv},
+		{6, 3, 2, gfDiv},
 	}
 
 	for _, tt := range tests {
@@ -127,8 +127,8 @@ func TestPolynomialCreationAndEvaluation(t *testing.T) {
 		t.Fatalf("NewPolynomial error: %v", err)
 	}
 
-	if p.coefficients[0] != 42 {
-		t.Fatalf("expected intercept 42, got %d", p.coefficients[0])
+	if p.coeffs[0] != 42 {
+		t.Fatalf("expected intercept 42, got %d", p.coeffs[0])
 	}
 
 	if out := p.evaluate(0); out != 42 {
@@ -136,7 +136,7 @@ func TestPolynomialCreationAndEvaluation(t *testing.T) {
 	}
 
 	x := uint8(1)
-	expected := add(42, mult(x, p.coefficients[1]))
+	expected := gfAdd(42, gfMult(x, p.coeffs[1]))
 	if out := p.evaluate(x); out != expected {
 		t.Fatalf("expected %d, got %d", expected, out)
 	}
@@ -151,9 +151,9 @@ func TestPolynomialInterpolation(t *testing.T) {
 
 		xVals := []uint8{1, 2, 3}
 		yVals := []uint8{p.evaluate(1), p.evaluate(2), p.evaluate(3)}
-		out, err := interpolatePolynomialSafe(xVals, yVals, 0)
+		out, err := interpolatePolynomial(xVals, yVals, 0)
 		if err != nil {
-			t.Fatalf("InterpolatePolynomialSafe error: %v", err)
+			t.Fatalf("interpolatePolynomial error: %v", err)
 		}
 		if out != uint8(i) {
 			t.Fatalf("expected %d, got %d", uint8(i), out)
