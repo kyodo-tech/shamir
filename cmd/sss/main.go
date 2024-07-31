@@ -17,8 +17,8 @@ func main() {
 	encoding := flag.String("encoding", "base64", "Encoding: base64 or hex")
 	secret := flag.String("secret", "", "The secret to split (for split mode)")
 	sharesStr := flag.String("shares", "", "Comma-separated shares (for combine mode)")
-	N := flag.Int("n", 5, "Total number of shares")
-	T := flag.Int("t", 3, "Number of shares needed to reconstruct the secret")
+	n := flag.Int("n", 5, "Total number of shares")
+	t := flag.Int("t", 3, "Number of shares needed to reconstruct the secret")
 	flag.Parse()
 
 	switch *mode {
@@ -31,9 +31,9 @@ func main() {
 				os.Exit(1)
 			}
 			inputSecret = strings.TrimSpace(inputSecret)
-			splitSecret(inputSecret, *N, *T, *encoding)
+			splitSecret(inputSecret, *n, *t, *encoding)
 		} else {
-			splitSecret(*secret, *N, *T, *encoding)
+			splitSecret(*secret, *n, *t, *encoding)
 		}
 	case "combine":
 		if *sharesStr == "" {

@@ -36,10 +36,6 @@ func newPolynomial(intercept, degree uint8) (*polynomial, error) {
 }
 
 func (p *polynomial) evaluate(x uint8) uint8 {
-	if x == 0 {
-		return p.coeffs[0]
-	}
-
 	result := p.coeffs[len(p.coeffs)-1]
 	for i := len(p.coeffs) - 2; i >= 0; i-- {
 		result = gfAdd(gfMult(result, x), p.coeffs[i])
@@ -65,15 +61,10 @@ func Split(secret []byte, n, t int) ([][]byte, error) {
 		return nil, ErrEmptySecret
 	}
 
-	xCoords := make([]uint8, n)
-	for i := 0; i < n; i++ {
-		xCoords[i] = uint8(i + 1)
-	}
-
 	shares := make([][]byte, n)
 	for i := range shares {
 		shares[i] = make([]byte, len(secret)+1)
-		shares[i][len(secret)] = xCoords[i]
+		shares[i][len(secret)] = uint8(i + 1)
 	}
 
 	for i, b := range secret {
@@ -82,8 +73,8 @@ func Split(secret []byte, n, t int) ([][]byte, error) {
 			return nil, err
 		}
 
-		for j := 0; j < n; j++ {
-			shares[j][i] = p.evaluate(xCoords[j])
+		for j := range shares {
+			shares[j][i] = p.evaluate(uint8(j + 1))
 		}
 	}
 
@@ -180,12 +171,10 @@ func gfDiv(a, b uint8) (uint8, error) {
 }
 
 func gfInverse(a uint8) uint8 {
-	var inv uint8
 	for b := uint8(1); b != 0; b++ {
 		if gfMult(a, b) == 1 {
-			inv = b
-			break
+			return b
 		}
 	}
-	return inv
+	return 0 // This should never be reached if the input is non-zero
 }
